@@ -20,7 +20,7 @@ config_dir = Path(__file__).parent.parent / 'config'
 sys.path.insert(0, str(config_dir))
 
 try:
-    from prompt import KEYWORDS as ISSUE_CATEGORIZATION_PROMPT
+    from prompt import KEYWORDS as ISSUE_CATEGORIZATION_PROMPT  # type: ignore
 except ImportError:
     logger = logging.getLogger(__name__)
     logger.warning("Could not import issue categorization prompt from config/prompt.py")

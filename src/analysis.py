@@ -16,16 +16,15 @@ from pathlib import Path
 config_dir = Path(__file__).parent.parent / 'config'
 sys.path.insert(0, str(config_dir))
 
+logger = logging.getLogger(__name__)
+
 try:
-    from prompt import KEYWORDS as ISSUE_CATEGORIZATION_PROMPT
+    from prompt import KEYWORDS as ISSUE_CATEGORIZATION_PROMPT  # type: ignore
 except ImportError:
     logger.warning("Could not import issue categorization prompt from config/prompt.py")
     ISSUE_CATEGORIZATION_PROMPT = ""
 
 from .utils import save_json, load_json
-
-
-logger = logging.getLogger(__name__)
 
 
 ANALYSIS_INSTRUCTION = """
