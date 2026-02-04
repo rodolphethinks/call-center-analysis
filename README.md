@@ -1,16 +1,16 @@
 # Call Center Analytics Platform
 
-A production-ready AI-powered call center analytics system that transcribes audio recordings, analyzes customer interactions, and generates actionable insights.
+A production-ready AI-powered call center analytics system for Renault Korea that analyzes audio recordings and generates actionable insights using Google's Gemini 2.5 Flash Lite with structured output.
 
 ## Features
 
-- 🎙️ **Audio Transcription**: Automatic speech-to-text using Whisper AI (supports Korean and other languages)
-- 🤖 **AI Analysis**: Sentiment analysis, issue classification, and agent performance evaluation using Gemini AI
-- 📊 **Visualizations**: Comprehensive charts and dashboards for insights
-- 📝 **Reporting**: Export results to Excel, CSV, and Word documents
-- 💾 **Database**: SQLite storage for historical data and analytics
-- 🚀 **Async Processing**: Fast parallel processing for large datasets
-- 🐳 **Docker Support**: Easy deployment with containerization
+- 🎙️ **Direct Audio Analysis**: Gemini 2.5 Flash Lite analyzes audio directly using Files API - no separate transcription needed
+- 🤖 **Structured Output**: Type-safe analysis with Pydantic models ensuring consistent JSON schema
+- 📊 **Visualizations**: Comprehensive charts including top issue categories, sentiment trajectories, and resolution status
+- 📝 **Reporting**: Export results to Excel, CSV, and Word documents with proper Korean text support
+- 🚀 **Parallel Processing**: 32 concurrent workers for fast batch processing (200 files in ~5-10 minutes)
+- 🔄 **Checkpoint Recovery**: Automatic progress tracking with resume capability
+- 💾 **Issue Categorization**: ~200 predefined vehicle issue categories with exclusion/override rules
 - ⚙️ **CLI Interface**: Simple command-line interface for all operations
 
 ## Project Structure
@@ -19,25 +19,28 @@ A production-ready AI-powered call center analytics system that transcribes audi
 call-center-analytics/
 ├── src/
 │   ├── __init__.py
-│   ├── transcription.py      # Audio transcription logic
-│   ├── analysis.py            # AI-powered conversation analysis
+│   ├── gemini_audio.py        # Gemini direct audio analysis with Files API
+│   ├── analysis.py            # Legacy Gemini text analysis (deprecated)
+│   ├── transcription.py       # Legacy Whisper transcription (deprecated)
 │   ├── database.py            # Database operations
-│   ├── reporting.py           # Report generation (Excel, Word)
+│   ├── reporting.py           # Report generation (Excel, Word, CSV, JSON)
 │   ├── visualization.py       # Chart and graph generation
 │   └── utils.py               # Utility functions
+├── config/
+│   ├── config.yaml            # Configuration settings
+│   └── prompt.py              # Vehicle issue categorization rules (~200 categories)
 ├── tests/
 │   ├── __init__.py
 │   ├── test_transcription.py
 │   └── test_analysis.py
 ├── data/
-│   ├── audio/                 # Input audio files
-│   ├── output/                # Generated reports
+│   ├── audio/                 # Input audio files (WAV format, organized by duration)
+│   ├── output/                # Generated reports and visualizations
 │   └── database/              # SQLite database
-├── config/
-│   └── config.yaml            # Configuration settings
 ├── main.py                    # CLI entry point
 ├── requirements.txt           # Python dependencies
 ├── .env.example               # Environment variables template
+├── .gitignore                 # Git ignore rules
 ├── Dockerfile                 # Docker configuration
 ├── docker-compose.yml         # Docker Compose setup
 └── README.md                  # This file
@@ -70,10 +73,9 @@ call-center-analytics/
    # cp .env.example .env  # Linux/Mac
    ```
    
-   Edit `.env` and add your API keys:
+   Edit `.env` and add your Gemini API key:
    ```
    GEMINI_API_KEY=your_gemini_api_key_here
-   HUGGINGFACE_TOKEN=your_huggingface_token_here
    ```
 
 ### Option 2: Docker Installation
@@ -84,34 +86,48 @@ docker-compose up -d
 
 ## Usage
 
-### 1. Transcribe Audio Files
+### Recommended: Gemini Pipeline (Fast & Direct)
+
+Process all audio files with Gemini 2.5 Flash Lite (direct audio analysis, no transcription step):
 
 ```bash
-python main.py transcribe --input-dir data/audio --output transcriptions.json
+python main.py gemini-pipeline --input-dir audio --output-dir data/output --workers 32
 ```
 
-### 2. Analyze Transcriptions
+This will:
+1. Analyze all audio files in parallel (32 workers)
+2. Extract transcription + analysis in a single API call
+3. Save results to `data/output/transcriptions.json` and `data/output/analysis.json`
+4. Generate Excel/Word reports
+5. Create visualizations
+
+### Generate Reports Only
 
 ```bash
-python main.py analyze --input transcriptions.json --output analysis.json
+python main.py report --transcriptions data/output/transcriptions.json --analysis data/output/analysis.json --audio-dir audio --output data/output/call_center_analysis --format excel
 ```
 
-### 3. Generate Reports
+Supported formats: `excel`, `csv`, `word`, `json`, `all`
+
+### Generate Visualizations Only
 
 ```bash
-python main.py report --input analysis.json --format excel --output data/output/report.xlsx
+python main.py visualize --transcriptions data/output/transcriptions.json --analysis data/output/analysis.json --audio-dir audio --output-dir data/output/visualizations
 ```
 
-### 4. Generate Visualizations
+### Legacy Pipeline (Deprecated)
+
+The old Whisper → Gemini pipeline is still available but slower:
 
 ```bash
-python main.py visualize --input analysis.json --output-dir data/output/charts
-```
+# 1. Transcribe with Whisper
+python main.py transcribe --input-dir audio --output data/output/transcriptions.json
 
-### 5. Run Full Pipeline
+# 2. Analyze transcriptions
+python main.py analyze --transcriptions data/output/transcriptions.json --output data/output/analysis.json
 
-```bash
-python main.py pipeline --input-dir data/audio --output-dir data/output
+# 3. Full pipeline
+python main.py pipeline --input-dir audio --output-dir data/output
 ```
 
 ## Configuration
@@ -119,69 +135,122 @@ python main.py pipeline --input-dir data/audio --output-dir data/output
 Edit `config/config.yaml` to customize:
 
 - Audio processing settings
-- AI model parameters
+- Gemini model parameters
 - Visualization preferences
 - Database configuration
 - Logging levels
 
 Example:
 ```yaml
-transcription:
-  model: "openai/whisper-large-v3-turbo"
-  language: "Korean"
-  batch_size: 24
-  chunk_length: 30
-
-analysis:
-  model: "gemini-2.0-flash"
+gemini:
+  model: "gemini-2.5-flash-lite"
   max_workers: 32
   retry_attempts: 3
 
+transcription:
+  model: "openai/whisper-large-v3-turbo"  # Legacy - not used by gemini-pipeline
+  language: "Korean"
+  batch_size: 24
+
 database:
   path: "data/database/analytics.db"
+
+visualization:
+  style: "ggplot"
+  dpi: 150
 ```
+
+### Issue Categorization
+
+Vehicle issue categories are defined in `config/prompt.py` with ~200 specific categories including:
+- Navigation and infotainment issues
+- Mechanical problems (engine, transmission, CV joints)
+- Electrical issues (battery, sensors, warning lights)
+- ADAS and safety features
+- Comfort and convenience features
+
+The system uses exclusion and override rules to accurately categorize customer concerns.
 
 ## API Keys Setup
 
-### Gemini API Key
-1. Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
+### Gemini API Key (Required)
+1. Visit [Google AI Studio](https://aistudio.google.com/apikey)
 2. Create an API key
-3. Add to `.env` file
+3. Add to `.env` file as `GEMINI_API_KEY=your_key_here`
 
-### HuggingFace Token
-1. Visit [HuggingFace Settings](https://huggingface.co/settings/tokens)
-2. Create a read token
-3. Add to `.env` file
+**Note**: HuggingFace token is no longer required for the Gemini pipeline.
 
 ## Features Detail
 
-### Transcription
-- Automatic language detection
-- Quality verification with AI
-- Progress tracking and checkpointing
-- Retry logic for failed files
-- Support for WAV, MP3, and other audio formats
+### Direct Audio Analysis with Gemini
+- **Files API Integration**: Uploads audio to Gemini, analyzes, then deletes
+- **Structured Output**: Pydantic models ensure consistent JSON schema
+- **No Transcription Errors**: Bypasses separate transcription step that could introduce errors
+- **Parallel Processing**: 32 concurrent workers for fast batch processing
+- **Checkpoint Recovery**: Automatic progress tracking with `gemini_progress.json`
+- **Graceful Shutdown**: Ctrl+C saves progress before exiting
 
-### Analysis
-- Customer sentiment trajectory (positive/negative trends)
-- Issue classification (Customer, Vehicle, After-Sales, Other)
-- Agent performance evaluation
-- Resolution status tracking
-- Improvement suggestions
+### Analysis Features
+- **Customer Sentiment Trajectory**: 
+  - "consistently neutral"
+  - "consistently positive"  
+  - "consistently negative"
+  - "negative to positive"
+- **Issue Classification**: ~200 vehicle-specific categories with override rules
+- **Agent Performance Evaluation**: Professionalism, understanding, effectiveness
+- **Resolution Status**: Resolved, Partially Resolved, Escalate to next step, Unresolved
+- **Improvement Suggestions**: Specific, actionable recommendations
 
 ### Reporting
-- Excel spreadsheets with multiple sheets
-- Word documents with formatted analysis
-- CSV exports for external tools
-- JSON output for programmatic access
+- **Excel**: Multi-column spreadsheet with proper Korean text (Unicode NFC normalization)
+- **Word**: Formatted documents with Malgun Gothic font for Korean
+- **CSV**: Compatible with external tools
+- **JSON**: Programmatic access to raw data
+- **Pipe-Separated Categories**: Prevents splitting categories that contain commas
 
 ### Visualizations
-- Call duration distributions
-- Sentiment trajectory charts
-- Resolution status breakdowns
-- Issue frequency analysis
-- Agent performance metrics
-- Word clouds for common issues
+- **Call Duration Distribution**: Histogram with symlog scale for long calls
+- **Sentiment Trajectory**: Pie chart of 4 sentiment categories with custom colors
+- **Resolution Status**: Bar chart (excludes N/A values)
+- **Top 15 Issue Categories**: Horizontal bar chart with full category names
+- **Issue Categories Pie Chart**: Top 12 categories with "Other" for remainder
+- **Word Cloud**: Common issues visualization
+- **Duration vs Resolution**: Scatter plot with sentiment coloring
+
+All charts properly handle categories with commas (e.g., "Instrument cluster warning light on (STOP, wrench)").
+
+## Troubleshooting
+
+### JSON Parsing Errors (Resolved)
+The system now uses **structured output** with Pydantic models, eliminating JSON parsing errors that occurred with the old text-based approach.
+
+### Category Name Truncation (Resolved)
+Categories are now separated by ` | ` instead of `,` to prevent splitting names that contain commas internally.
+
+### API Rate Limits
+Adjust concurrency:
+```bash
+python main.py gemini-pipeline --input-dir audio --output-dir data/output --workers 16
+```
+
+Or in `config/config.yaml`:
+```yaml
+gemini:
+  max_workers: 16  # Reduce from 32
+```
+
+### Checkpoint Recovery
+If processing is interrupted, simply run the same command again:
+```bash
+python main.py gemini-pipeline --input-dir audio --output-dir data/output --workers 32
+```
+
+The system will:
+1. Load existing results from `gemini_progress.json`
+2. Skip already-processed files
+3. Resume from where it left off
+
+To start fresh, delete `gemini_progress.json`.
 
 ## Development
 
@@ -198,28 +267,22 @@ black src/ tests/
 flake8 src/ tests/
 ```
 
-## Troubleshooting
+## Technology Stack
 
-### CUDA/GPU Issues
-If you don't have a GPU, the system will automatically use CPU. To force CPU:
-```bash
-python main.py transcribe --input-dir data/audio --device cpu
-```
+- **Google Gemini 2.5 Flash Lite**: Direct audio analysis with structured output
+- **Pydantic**: Type-safe schema validation
+- **Files API**: Reliable audio upload/analysis/cleanup
+- **Pandas**: Data manipulation and reporting
+- **Matplotlib**: Visualization generation
+- **OpenPyXL**: Excel file generation
+- **Python-docx**: Word document generation
 
-### Out of Memory
-Reduce batch size in `config/config.yaml`:
-```yaml
-transcription:
-  batch_size: 8  # Reduce from default 24
-```
+## Performance
 
-### API Rate Limits
-Adjust concurrency in config:
-```yaml
-analysis:
-  max_workers: 8  # Reduce from default 32
-  delay_between_requests: 0.1  # Increase delay
-```
+- **200 audio files**: ~5-10 minutes with 32 workers
+- **Parallel processing**: ThreadPoolExecutor with 32 concurrent API calls
+- **Memory efficient**: Files uploaded to Gemini, not loaded in memory
+- **Checkpoint recovery**: Resume from interruptions without re-processing
 
 ## License
 
@@ -227,10 +290,10 @@ MIT License
 
 ## Support
 
-For issues and questions, please open an issue on GitHub.
+For issues and questions, please open an issue on [GitHub](https://github.com/rodolphethinks/call-center-analysis).
 
 ## Acknowledgments
 
-- OpenAI Whisper for speech recognition
-- Google Gemini for AI analysis
-- HuggingFace for model hosting
+- Google Gemini AI for advanced audio analysis
+- Pydantic for structured output validation
+- The open-source Python community
