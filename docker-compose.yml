@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  call-center-analytics:
+    build: .
+    container_name: call-center-analytics
+    volumes:
+      # Mount audio files
+      - ./data/audio:/app/data/audio
+      # Mount output directory
+      - ./data/output:/app/data/output
+      # Mount database directory
+      - ./data/database:/app/data/database
+      # Mount config (optional override)
+      - ./config:/app/config
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: python main.py pipeline --input-dir /app/data/audio --output-dir /app/data/output
+    
+    # For GPU support (uncomment if you have NVIDIA GPU)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]

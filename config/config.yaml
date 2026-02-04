@@ -1,0 +1,106 @@
+# Application Settings
+app:
+  name: "Call Center Analytics Platform"
+  version: "1.0.0"
+  log_level: "INFO"
+
+# Audio Transcription Settings
+transcription:
+  model: "openai/whisper-large-v3-turbo"
+  language: "Korean"
+  device: "cuda"  # auto, cuda, cpu
+  batch_size: 24
+  chunk_length: 30
+  return_timestamps: true
+  quality_verification: false  # Disabled - chunking fix resolved quality issues
+  max_retries: 3
+  supported_formats:
+    - ".wav"
+    - ".WAV"
+    - ".mp3"
+    - ".MP3"
+    - ".m4a"
+    - ".flac"
+
+# AI Analysis Settings
+analysis:
+  model: "gemini-2.0-flash"
+  max_workers: 32
+  delay_between_requests: 0.03
+  retry_attempts: 5
+  retry_min_wait: 1
+  retry_max_wait: 10
+  
+  # Analysis categories
+  sentiment_categories:
+    - "positive to negative"
+    - "negative to positive"
+    - "consistently positive"
+    - "consistently negative"
+  
+  resolution_statuses:
+    - "Resolved"
+    - "Partially Resolved"
+    - "Escalate to next step"
+    - "Unresolved"
+  
+  issue_categories:
+    - "Customer Issues"
+    - "Vehicle Issues"
+    - "AS Issues"
+    - "Other Issues"
+
+# Database Settings
+database:
+  path: "data/database/analytics.db"
+  backup_enabled: true
+  backup_interval_hours: 24
+
+# Reporting Settings
+reporting:
+  output_formats:
+    - "excel"
+    - "csv"
+    - "json"
+    - "docx"
+  
+  excel:
+    max_cell_length: 32000
+    freeze_panes: true
+    auto_filter: true
+  
+  word:
+    font_name: "Calibri"
+    font_size: 11
+    heading_size: 14
+
+# Visualization Settings
+visualization:
+  style: "ggplot"
+  figure_size: [12, 8]
+  dpi: 150
+  color_palette: "Set3"
+  
+  charts:
+    - "call_duration_distribution"
+    - "resolution_status"
+    - "sentiment_trajectory"
+    - "issue_frequency"
+    - "agent_performance"
+    - "sentiment_vs_resolution"
+    - "top_customer_issues"
+    - "top_vehicle_issues"
+    - "top_as_issues"
+
+# Processing Settings
+processing:
+  save_interval: 10  # Save checkpoint every N files
+  checkpoint_enabled: true
+  progress_bar: true
+  verbose: true
+
+# Export Settings
+export:
+  date_format: "%Y-%m-%d %H:%M:%S"
+  encoding: "utf-8"
+  compression: false
